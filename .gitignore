@@ -5,3 +5,4 @@ mlruns/
 *.db
 !docker-compose.yml
 .DS_Store
+PROJECT_BRIEF.md
