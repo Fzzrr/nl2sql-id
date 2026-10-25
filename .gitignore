@@ -3,3 +3,5 @@
 __pycache__/
 mlruns/
 *.db
+!docker-compose.yml
+.DS_Store

@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: nl2sql
+      POSTGRES_PASSWORD: nl2sql      # local only, fine for synthetic data
+      POSTGRES_DB: payments
+    ports: ["5432:5432"]
+    volumes:
+      - ./data/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
