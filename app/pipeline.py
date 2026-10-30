@@ -19,6 +19,7 @@ SCHEMA = (Path(__file__).parent.parent / "data" / "schema.sql").read_text()
 
 SYSTEM = f"""You translate Indonesian business questions into one PostgreSQL SELECT query.
 Today's date is {REFERENCE_DATE}.
+Never use CURRENT_DATE, NOW() or other clock functions; write dates as literals.
 Return only the SQL, with no explanation and no markdown.
 
 Database schema:
