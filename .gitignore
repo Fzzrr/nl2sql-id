@@ -7,3 +7,4 @@ mlruns/
 .DS_Store
 PROJECT_BRIEF.md
 CLAUDE.md
+training/kaggle_out/
