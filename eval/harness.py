@@ -10,12 +10,15 @@ from app.pipeline import MODEL, generate_sql, run_sql
 from eval.metrics import has_order_by, percentile, results_match, wilson
 
 
-def evaluate(items):
+def evaluate(items, preds=None):
     records = []
     for item in items:
-        start = time.perf_counter()
-        sql = generate_sql(item["question"])
-        latency_ms = round((time.perf_counter() - start) * 1000)
+        if preds:
+            sql, latency_ms = preds[item["id"]]["pred_sql"], preds[item["id"]]["latency_ms"]
+        else:
+            start = time.perf_counter()
+            sql = generate_sql(item["question"])
+            latency_ms = round((time.perf_counter() - start) * 1000)
         try:
             _, pred_rows = run_sql(sql)
             valid, error = True, None
@@ -36,12 +39,12 @@ def evaluate(items):
     return records
 
 
-def report(records):
+def report(records, model):
     n = len(records)
     k = sum(r["correct"] for r in records)
     lo, hi = wilson(k, n)
     latencies = [r["latency_ms"] for r in records]
-    print(f"\nModel: {MODEL}")
+    print(f"\nModel: {model}")
     print(f"Execution accuracy: {k}/{n} = {k / n:.0%}  (95% CI {lo:.0%}-{hi:.0%})")
     print(f"Valid SQL: {sum(r['valid'] for r in records)}/{n}")
     print(f"Latency: p50 {percentile(latencies, 0.5)} ms, p95 {percentile(latencies, 0.95)} ms")
@@ -53,16 +56,20 @@ def report(records):
 
 if __name__ == "__main__":
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "eval/smoke_questions.jsonl")
+    # Optional second argument: predictions made elsewhere (e.g. Kaggle), named <model>.jsonl
+    preds_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
     items = [json.loads(line) for line in path.open()]
     verified = [item for item in items if item["verified"]]
     print(f"{len(verified)} verified of {len(items)} items in {path}\n")
     if not verified:
         sys.exit("Nothing to evaluate: no verified items.")
 
-    records = evaluate(verified)
-    report(records)
+    preds = {p["id"]: p for p in map(json.loads, preds_path.open())} if preds_path else None
+    model = preds_path.stem if preds_path else MODEL.replace(":", "-")
+    records = evaluate(verified, preds)
+    report(records, model)
 
-    out = Path("eval/results") / f"{path.stem}__{MODEL.replace(':', '-')}.jsonl"
+    out = Path("eval/results") / f"{path.stem}__{model}.jsonl"
     out.parent.mkdir(exist_ok=True)
     out.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records))
     print(f"\nPredictions saved to {out}")
