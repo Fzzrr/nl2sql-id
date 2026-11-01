@@ -1,0 +1,95 @@
+# Canonical business definitions. All gold SQL and prompts follow these.
+# Ratios are fractions (0.87), not percentages (87). Divide after casting to ::numeric.
+# Date filters are half-open: created_at >= start AND created_at < end.
+
+reference_date: "2026-09-30"  # "today" for every relative date; a Wednesday
+
+terms:
+  - term: transaksi
+    aliases: [jumlah transaksi, transaction]
+    definition: >
+      With no status word (sukses, gagal, pending) and no money word (GMV, nilai), counts every status.
+      Gold items relying on this are tagged ambiguous.
+    sql: "COUNT(*)"
+
+  - term: transaksi sukses
+    aliases: [transaksi berhasil, successful transaction]
+    definition: A transaction with status 'success'.
+    sql: "status = 'success'"
+
+  - term: success rate
+    aliases: [tingkat keberhasilan, rasio sukses, SR]
+    definition: Successful / (successful + failed). Pending transactions are excluded from both sides.
+    sql: |
+      COUNT(*) FILTER (WHERE status = 'success')::numeric
+        / NULLIF(COUNT(*) FILTER (WHERE status IN ('success', 'failed')), 0)
+
+  - term: GMV
+    aliases: [gross merchandise value, nilai transaksi, total transaksi sukses]
+    definition: Sum of amount_idr over successful transactions. amount_idr is the price before any promo discount.
+    sql: "SUM(amount_idr) FILTER (WHERE status = 'success')"
+
+  - term: MDR
+    aliases: [merchant discount rate]
+    definition: The fee fraction charged to a merchant, stored per merchant (0.0070 = 0.7%).
+    sql: "merchants.mdr_rate"
+
+  - term: take rate
+    aliases: [tingkat potongan, rasio fee]
+    definition: Sum of fee_idr / GMV, both over successful transactions.
+    sql: |
+      SUM(fee_idr) FILTER (WHERE status = 'success')::numeric
+        / NULLIF(SUM(amount_idr) FILTER (WHERE status = 'success'), 0)
+
+  - term: refund rate
+    aliases: [tingkat refund, rasio refund]
+    definition: >
+      Refunds of successful transactions created in the period / successful transactions
+      created in the period. The period is set by the transaction's created_at, not refunded_at.
+    sql: |
+      SELECT COUNT(r.refund_id)::numeric / NULLIF(COUNT(*), 0)
+      FROM transactions t
+      LEFT JOIN refunds r ON r.txn_id = t.txn_id
+      WHERE t.status = 'success' AND t.created_at >= :start AND t.created_at < :end
+
+  - term: settlement
+    aliases: [pencairan, payout, dana ke merchant]
+    definition: Payout to the merchant, one row per merchant per settle_date (T+1). net_idr = gross_idr - fee_idr.
+    sql: "SUM(net_idr) FROM settlements"
+
+  - term: promo cost
+    aliases: [biaya promo, total diskon, subsidi promo]
+    definition: Sum of discount_idr. Does not reduce GMV.
+    sql: "SUM(discount_idr)"
+
+  - term: gajian period
+    aliases: [periode gajian, tanggal gajian, gajian]
+    definition: >
+      The 25th of a month through the 2nd of the next month. "Gajian <month>" means the 25th of that
+      month through the 2nd of the following month.
+    sql: "(EXTRACT(DAY FROM created_at) >= 25 OR EXTRACT(DAY FROM created_at) <= 2)"
+
+# Relative dates, resolved against reference_date (2026-09-30). range is [start, end): end is exclusive.
+relative_dates:
+  - term: hari ini
+    range: ["2026-09-30", "2026-10-01"]
+  - term: kemarin
+    range: ["2026-09-29", "2026-09-30"]
+  - term: minggu lalu
+    aliases: [pekan lalu, minggu kemarin]
+    definition: The previous full calendar week, Monday to Sunday.
+    range: ["2026-09-21", "2026-09-28"]
+  - term: bulan ini
+    range: ["2026-09-01", "2026-10-01"]
+  - term: bulan lalu
+    aliases: [bulan kemarin]
+    definition: The previous full calendar month.
+    range: ["2026-08-01", "2026-09-01"]
+  - term: kuartal kemarin
+    aliases: [kuartal lalu, Q lalu]
+    definition: The previous full calendar quarter.
+    range: ["2026-04-01", "2026-07-01"]
+  - term: tahun ini
+    range: ["2026-01-01", "2026-10-01"]
+  - term: tahun lalu
+    range: ["2025-01-01", "2026-01-01"]
