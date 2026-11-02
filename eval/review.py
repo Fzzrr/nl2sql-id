@@ -4,6 +4,8 @@ import re
 import sys
 from pathlib import Path
 
+import psycopg
+
 from app.pipeline import run_sql
 
 BANNED = re.compile(r"CURRENT_DATE|NOW\(\)|BETWEEN", re.IGNORECASE)  # gold SQL conventions
@@ -25,7 +27,11 @@ def main(path):
         print(f"SQL:   {item['gold_sql']}")
         if BANNED.search(item["gold_sql"]):
             print("WARNING: uses CURRENT_DATE, NOW() or BETWEEN")
-        columns, rows = run_sql(item["gold_sql"])
+        try:
+            columns, rows = run_sql(item["gold_sql"])
+        except psycopg.Error as e:
+            print(f"ERROR: {str(e).splitlines()[0]}")
+            columns, rows = [], []
         print(f"{len(rows)} rows {columns}")
         for row in rows[:10]:
             print("  ", row)
@@ -39,6 +45,7 @@ def main(path):
             to_fix.append(item["id"])
     print(f"\n{sum(item['verified'] for item in items)}/{len(items)} verified. "
           f"Needs fixing: {', '.join(to_fix) or 'none'}")
+
 
 if __name__ == "__main__":
     main(sys.argv[1])
