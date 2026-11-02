@@ -73,13 +73,16 @@ def git(*args):
 
 def log_run(question_set, model, config, metrics, results_path):
     mlflow.set_experiment("nl2sql-id")
+    # Without this tag, the MLflow 3 UI shows its GenAI (traces) view, which is empty for these runs.
+    mlflow.set_experiment_tag("mlflow.experimentKind", "custom_model_development")
     with mlflow.start_run(run_name=results_path.stem):
         mlflow.log_params({
             "question_set": question_set,
             "model": model,
             "config": config,
             "git_commit": git("rev-parse", "--short", "HEAD"),
-            "git_dirty": bool(git("status", "--porcelain")),  # True: code differed from that commit
+            # True: code differed from that commit. Result files written by eval runs don't count.
+            "git_dirty": bool(git("status", "--porcelain", "--", ".", ":(exclude)eval/results")),
         })
         mlflow.log_metrics(metrics)
         mlflow.log_artifact(str(results_path))
