@@ -85,6 +85,8 @@ eval/
   metrics.py        # result comparison, Wilson interval
   harness.py        # runs a question set, writes eval/results/
   results/          # recorded runs (committed)
+  review.py         # interactive review of unverified gold SQL
+  test_questions.jsonl    # 100-question test set (30 easy / 40 medium / 30 hard)
   smoke_questions.jsonl   # 10 smoke-test questions (toy schema, retired)
 training/
   make_toy_pairs.py # templated training pairs for the toy QLoRA run
@@ -170,7 +172,7 @@ Each line of an eval file is one JSON object:
 ```
 
 - **Primary metric:** execution accuracy. The predicted SQL and the gold SQL are both executed, and the result rows are compared. Row order is compared only when the gold SQL has `ORDER BY`.
-- **`verified`:** only verified items count toward reported metrics. The 50 items in `eval/drafts.jsonl` were drafted and reviewed with an AI assistant, not by hand: every gold SQL was executed, top-N answers were checked for ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
+- **`verified`:** only verified items count toward reported metrics. The 100-item test set (`eval/test_questions.jsonl`) was drafted and reviewed with an AI assistant; only `test_051` and `test_052` were also checked by hand. Every gold SQL was executed, top-N answers were checked for ties and near-ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
 - **`notes`:** records how ambiguous questions were resolved. Ambiguity is reported as its own failure category, not hidden.
 
 Run a question set with `uv run python -m eval.harness eval/<set>.jsonl`.
