@@ -6,15 +6,16 @@ Ask business questions about digital payments **in Indonesian** and get back the
 
 The focus is on evidence rather than the app: a frozen, verified test set, honest comparisons between approaches, and production-style safety and CI.
 
-> **Status: early work in progress (dataset stage).** The smoke test is finished: a zero-shot local model, an execution-accuracy harness and a toy QLoRA run all work end to end on a 3-table toy schema. That schema has now been replaced by the full 8-table dataset. The real dev and test sets are being written next; no headline numbers are reported until they exist.
+> **Status: work in progress (baseline measured).** The 8-table dataset, a frozen 100-question test set (git tag `test-frozen`), an informal variant and a dev set exist. The zero-shot baseline scores **45% on the test set (95% CI 36–55%)** and 34% on its informal variant. The ablations (schema selection, glossary, few-shot, retry) come next.
 
 ## What works today
 
 - A PostgreSQL database (Docker) with an 8-table synthetic payments schema
 - A **seeded** generator: one command always produces exactly the same ~300k transactions (Jan 2025 – Sep 2026) with Indonesian patterns: paydays, Harbolnas, Ramadan and Lebaran, bank incidents
 - Invariant tests for the generator and the metrics (`uv run pytest`)
-- An execution-accuracy harness with Wilson 95% confidence intervals
-- A zero-shot baseline (`qwen2.5-coder:7b` on local Ollama) and a toy QLoRA run, both measured on 10 smoke-test questions (see [Smoke-test results](#smoke-test-results))
+- A frozen 100-question test set, its informal variant, and a 30-question dev set
+- An execution-accuracy harness with Wilson 95% confidence intervals; every run is logged to MLflow
+- A zero-shot baseline (`qwen2.5-coder:7b` on local Ollama) measured on all three sets (see [Results](#results))
 
 All data is synthetic. No real company data, schemas or personal data are used.
 
@@ -181,6 +182,44 @@ Each line of an eval file is one JSON object:
 
 Run a question set with `uv run python -m eval.harness eval/<set>.jsonl`.
 
+## Results
+
+**Config 1, the baseline:** `qwen2.5-coder:7b` on local Ollama, temperature 0, zero-shot. The prompt holds the full `schema.sql` and the reference date, nothing else. Measured at commit `dcd18da`.
+
+| Set | n | Correct | 95% CI | Valid SQL | Easy | Medium | Hard | Latency p50 / p95 |
+|---|---|---|---|---|---|---|---|---|
+| Dev | 30 | 14 (47%) | 30–64% | 29/30 | 7/9 | 6/12 | 1/9 | 2.2 s / 4.5 s |
+| **Test** | 100 | **45 (45%)** | 36–55% | 92/100 | 25/30 | 16/40 | 4/30 | 2.5 s / 5.6 s |
+| Test, informal | 100 | 34 (34%) | 25–44% | 93/100 | 23/30 | 10/40 | 1/30 | 2.3 s / 5.1 s |
+
+- **Informal phrasing costs 11 points** (45% → 34%) on the same 100 gold queries. The confidence intervals overlap, but the comparison is paired: 11 questions were answered correctly only in their clean form and none only in their informal form (exact McNemar test, p = 0.001).
+- **Accuracy collapses with difficulty:** 83% on easy test questions, 40% on medium, 13% on hard.
+- **Most failures are wrong logic, not broken SQL:** 92% of test predictions execute. Retrying on SQL errors (config 5) can therefore fix at most 8 test questions.
+- Cost is 0: the model runs locally.
+
+## Error analysis (dev set)
+
+Failures are studied on the dev set only; the test set is only scored, so that prompt changes are not tuned to it. Each of the 16 dev failures of config 1 is assigned one primary cause:
+
+| Cause | Count | Example |
+|---|---|---|
+| Metric definition (glossary) | 6 | GMV summed over every status (dev_02, dev_12); take rate computed as `AVG(amount × mdr_rate)` (dev_15); refund rate from an inner join, so every segment scores 100% (dev_22) |
+| Question misread | 2 | "porsi" (share) answered with a count (dev_24); "Juli dan juga Agustus" answered with `OR` instead of users present in both months (dev_26) |
+| Date logic | 2 | "minggu lalu" read as 25–30 September (dev_09); "kuartal kemarin" read as June–August (dev_25) |
+| Wrong table or join | 2 | Fee summed from `settlements` instead of `transactions` (dev_17); `bank_id` returned without joining `banks` (dev_27) |
+| Extra column | 2 | Correct answer (QRIS, Yogyakarta) plus an unrequested count or rate column (dev_14, dev_23) |
+| Ambiguous question | 1 | "jumlah transaksi pada tanggal 20, 21, dan 22 Maret" answered as one total; the gold expects one row per day (dev_16) |
+| Invalid SQL | 1 | Nested aggregate `AVG(SUM(...))` (dev_29) |
+
+Patterns across categories:
+
+- **No success filter** in 6 of the 16 failures. The model does not know that GMV, take rate and refund rate count successful transactions only, which is exactly what the glossary (config 3) supplies.
+- **Percentages instead of fractions** in 3 failures (`* 100.0`), also a glossary convention.
+- **`BETWEEN`** appears in 6 failures. On a timestamp column (dev_25, dev_26) it silently loses data: `created_at BETWEEN '2026-07-01' AND '2026-07-31'` stops at midnight at the start of 31 July, so that day's transactions are dropped.
+- Under the strict comparison, 2 dev answers count as wrong only because of an extra column; with that column removed, the dev score would be 16/30.
+
+What this predicts for the ablations: the glossary (config 3) targets the largest group, few-shot examples (config 4) target output shape and date patterns, schema selection (config 2) targets the wrong-table cases, and retry (config 5) can only help the single invalid query.
+
 ## Smoke-test results
 
 10 hand-verified questions on the retired 3-table toy schema. With n = 10 the intervals are very wide, so these numbers only show that the pipeline works; they are not evidence about model quality.
@@ -205,7 +244,8 @@ The adapter's gain over the 1.5B base is not significant at n = 10, and its 51 t
 - [x] Smoke test end to end: one LLM call → SQL → execute → compare with gold
 - [x] Execution-accuracy harness with confidence intervals
 - [x] Full 8-table schema and ~300k transactions with realistic Indonesian patterns (payday, Harbolnas, Ramadan)
-- [ ] 100-question test set (frozen) plus an informal/slang variant, and a separate dev set
+- [x] 100-question test set (frozen) plus an informal/slang variant, and a separate dev set
+- [x] Zero-shot baseline on dev, test and informal, logged to MLflow
 - [ ] Ablations: schema selection, glossary, few-shot, retry-on-error
 - [ ] QLoRA fine-tune of a small open model, compared with the zero-shot baseline
 - [ ] SQL safety layer (SELECT-only, allow-list, read-only role, timeouts)
