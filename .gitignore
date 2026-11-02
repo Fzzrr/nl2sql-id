@@ -8,3 +8,5 @@ mlruns/
 PROJECT_BRIEF.md
 CLAUDE.md
 training/kaggle_out/
+mlflow.db
+mlruns/

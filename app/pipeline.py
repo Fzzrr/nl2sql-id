@@ -14,6 +14,7 @@ load_dotenv()
 DSN = os.environ.get("DATABASE_URL", "postgresql://nl2sql:nl2sql@localhost:5432/payments")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
+CONFIG = "c1"  # ablation config this prompt implements; logged with every eval run
 REFERENCE_DATE = "2026-09-30"
 SCHEMA = (Path(__file__).parent.parent / "data" / "schema.sql").read_text()
 
