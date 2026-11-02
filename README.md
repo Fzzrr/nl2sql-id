@@ -4,7 +4,7 @@ Ask business questions about digital payments **in Indonesian** and get back the
 
 > "Berapa success rate QRIS minggu lalu per kategori merchant?"
 
-The focus is on evidence rather than the app: a frozen, hand-verified test set, honest comparisons between approaches, and production-style safety and CI.
+The focus is on evidence rather than the app: a frozen, verified test set, honest comparisons between approaches, and production-style safety and CI.
 
 > **Status: early work in progress (dataset stage).** The smoke test is finished: a zero-shot local model, an execution-accuracy harness and a toy QLoRA run all work end to end on a 3-table toy schema. That schema has now been replaced by the full 8-table dataset. The real dev and test sets are being written next; no headline numbers are reported until they exist.
 
@@ -132,6 +132,7 @@ All gold SQL follows these definitions, so that "correct" has one meaning:
 | Take rate | `SUM(fee_idr) / GMV`, successful transactions only |
 | Refund rate | refunds of successful transactions created in the period / successful transactions created in the period |
 | Settlement | payout to the merchant; `net_idr = gross_idr - fee_idr` |
+| Promo cost | `SUM(discount_idr)` over successful transactions only; a failed payment gives no discount |
 | Gajian period | the 25th through the 2nd of the next month |
 | Minggu lalu / bulan lalu / kuartal kemarin | the previous full calendar week (Mon–Sun) / month / quarter |
 
@@ -169,7 +170,7 @@ Each line of an eval file is one JSON object:
 ```
 
 - **Primary metric:** execution accuracy. The predicted SQL and the gold SQL are both executed, and the result rows are compared. Row order is compared only when the gold SQL has `ORDER BY`.
-- **`verified`:** only items checked by hand count toward reported metrics.
+- **`verified`:** only verified items count toward reported metrics. The 50 items in `eval/drafts.jsonl` were drafted and reviewed with an AI assistant, not by hand: every gold SQL was executed, top-N answers were checked for ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
 - **`notes`:** records how ambiguous questions were resolved. Ambiguity is reported as its own failure category, not hidden.
 
 Run a question set with `uv run python -m eval.harness eval/<set>.jsonl`.
