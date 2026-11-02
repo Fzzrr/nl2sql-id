@@ -88,6 +88,7 @@ eval/
   review.py         # interactive review of unverified gold SQL
   overlap.py        # near-duplicate check between two question sets
   test_questions.jsonl    # 100-question test set (30 easy / 40 medium / 30 hard)
+  test_questions_informal.jsonl  # the same 100 in casual Indonesian, same gold SQL
   dev_questions.jsonl     # 30-question dev set for iteration (9 / 12 / 9)
   smoke_questions.jsonl   # 10 smoke-test questions (toy schema, retired)
 training/
@@ -175,7 +176,7 @@ Each line of an eval file is one JSON object:
 ```
 
 - **Primary metric:** execution accuracy. The predicted SQL and the gold SQL are both executed, and the result rows are compared. Row order is compared only when the gold SQL has `ORDER BY`.
-- **`verified`:** only verified items count toward reported metrics. The 100-item test set (`eval/test_questions.jsonl`) and the 30-item dev set (`eval/dev_questions.jsonl`) were drafted and reviewed with an AI assistant; only `test_051` and `test_052` were also checked by hand. Every gold SQL was executed, top-N answers were checked for ties and near-ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
+- **`verified`:** only verified items count toward reported metrics. The 100-item test set (`eval/test_questions.jsonl`) and the 30-item dev set (`eval/dev_questions.jsonl`) were drafted and reviewed with an AI assistant; only `test_051` and `test_052` were also checked by hand. The informal set rewrites each test question with slang, abbreviations and Indonesian-English mixing (for example "tolong tampilin sr qris mgg lalu per kategori merchant"); every rewrite was checked to keep the period, status, metric and names of the original, and no rewrite scores 0.80 or more in text similarity to its original. Every gold SQL was executed, top-N answers were checked for ties and near-ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
 - **`notes`:** records how ambiguous questions were resolved. Ambiguity is reported as its own failure category, not hidden.
 
 Run a question set with `uv run python -m eval.harness eval/<set>.jsonl`.
