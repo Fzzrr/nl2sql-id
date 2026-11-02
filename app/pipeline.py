@@ -1,4 +1,4 @@
-"""Question -> SQL -> rows. Smoke-test version: full schema, zero-shot."""
+"""Question -> SQL -> rows. Config 1 baseline: full schema, zero-shot."""
 import json
 import os
 import re

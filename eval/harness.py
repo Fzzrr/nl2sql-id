@@ -55,7 +55,9 @@ def report(records, model):
 
 
 if __name__ == "__main__":
-    path = Path(sys.argv[1] if len(sys.argv) > 1 else "eval/smoke_questions.jsonl")
+    if len(sys.argv) < 2:
+        sys.exit("Usage: python -m eval.harness eval/<set>.jsonl [predictions.jsonl]")
+    path = Path(sys.argv[1])
     # Optional second argument: predictions made elsewhere (e.g. Kaggle), named <model>.jsonl
     preds_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
     items = [json.loads(line) for line in path.open()]

@@ -1,7 +1,7 @@
 [project]
 name = "nl2sql-id"
 version = "0.1.0"
-description = "Add your description here"
+description = "Indonesian text-to-SQL agent over a synthetic payments database"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.4.6",
