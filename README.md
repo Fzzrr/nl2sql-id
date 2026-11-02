@@ -86,7 +86,9 @@ eval/
   harness.py        # runs a question set, writes eval/results/
   results/          # recorded runs (committed)
   review.py         # interactive review of unverified gold SQL
+  overlap.py        # near-duplicate check between two question sets
   test_questions.jsonl    # 100-question test set (30 easy / 40 medium / 30 hard)
+  dev_questions.jsonl     # 30-question dev set for iteration (9 / 12 / 9)
   smoke_questions.jsonl   # 10 smoke-test questions (toy schema, retired)
 training/
   make_toy_pairs.py # templated training pairs for the toy QLoRA run
@@ -160,6 +162,7 @@ Deliberate edge cases. Gold SQL has to handle each of them:
 - **The smoke set is retired, not ported.** Its 10 questions target the toy schema and were used to diagnose the baseline, so they are no longer fresh. The file and its recorded runs stay in git as history.
 - **Database constraints before application code.** `CHECK` constraints reject bad rows at load time (for example, a fee on a failed transaction, or `net_idr ≠ gross_idr - fee_idr`); the tests cover rules that span tables.
 - **Settlements are derived in SQL** from successful transactions, so they always agree with the transactions table.
+- **Dev and test questions do not overlap.** `eval/overlap.py` compares every dev question with every test question; none reaches the 0.85 near-duplicate threshold (the closest pair scores 0.82). Six dev/test pairs share a SQL shape with different literals (for example GMV for a different month); none of those dev items will be used as a few-shot example.
 - **Ramadan and Lebaran dates follow Kemenag:** Ramadan 2025 ran 1–30 March, with Idul Fitri on 31 March; Ramadan 2026 started 19 February, with Idul Fitri on 21 March.
 - **The schema file is the baseline's schema prompt.** Its comments describe structure and units only, never business definitions; definitions belong to the glossary, which is a separate configuration in the ablations.
 
@@ -172,7 +175,7 @@ Each line of an eval file is one JSON object:
 ```
 
 - **Primary metric:** execution accuracy. The predicted SQL and the gold SQL are both executed, and the result rows are compared. Row order is compared only when the gold SQL has `ORDER BY`.
-- **`verified`:** only verified items count toward reported metrics. The 100-item test set (`eval/test_questions.jsonl`) was drafted and reviewed with an AI assistant; only `test_051` and `test_052` were also checked by hand. Every gold SQL was executed, top-N answers were checked for ties and near-ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
+- **`verified`:** only verified items count toward reported metrics. The 100-item test set (`eval/test_questions.jsonl`) and the 30-item dev set (`eval/dev_questions.jsonl`) were drafted and reviewed with an AI assistant; only `test_051` and `test_052` were also checked by hand. Every gold SQL was executed, top-N answers were checked for ties and near-ties at the cutoff, and the trickiest answers were cross-checked against independently written queries.
 - **`notes`:** records how ambiguous questions were resolved. Ambiguity is reported as its own failure category, not hidden.
 
 Run a question set with `uv run python -m eval.harness eval/<set>.jsonl`.
