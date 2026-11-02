@@ -59,8 +59,8 @@ terms:
 
   - term: promo cost
     aliases: [biaya promo, total diskon, subsidi promo]
-    definition: Sum of discount_idr. Does not reduce GMV.
-    sql: "SUM(discount_idr)"
+    definition: Sum of discount_idr over successful transactions. Does not reduce GMV.
+    sql: "SUM(discount_idr) FILTER (WHERE status = 'success')"
 
   - term: gajian period
     aliases: [periode gajian, tanggal gajian, gajian]
